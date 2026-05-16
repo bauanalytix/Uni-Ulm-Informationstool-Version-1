@@ -323,7 +323,7 @@ async function createPDF() {
     const bauanalytixLogo = await loadImageAsDataURL('bauanalytix.jpg');
     const vubLogo = await loadImageAsDataURL('vub.png');
 
-    doc.addImage(bauanalytixLogo, 'PNG', 14, 8, 55, 11);
+    doc.addImage(bauanalytixLogo, 'PNG', 14, 8, 55, 10);
     doc.addImage(vubLogo, 'PNG', 230, 8, 48, 13);
   } catch (error) {
     console.warn('Logos konnten im PDF nicht geladen werden.', error);
