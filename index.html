@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UlmTool Demo M24</title>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f7f7f7;
+    color: #222;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: auto;
+  }
+
+  h1, h2 {
+    color: #a30000;
+  }
+
+  .box {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+
+  select, input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+  }
+
+  button {
+    margin-top: 18px;
+    margin-right: 8px;
+    padding: 10px 16px;
+    background: #a30000;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #7f0000;
+  }
+
+  .result {
+    border-bottom: 1px solid #ddd;
+    padding: 10px 0;
+  }
+
+  .result strong {
+    color: #a30000;
+  }
+
+  .small {
+    color: #666;
+    font-size: 0.9em;
+  }
+
+  .hint {
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 10px;
+  }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; gap:20px; flex-wrap:wrap;">
+  <img src="logos/bauanalytix.jpg" alt="bauanalytix" style="height:55px; object-fit:contain;">
+  <img src="logos/vub.png" alt="Vermögen und Bau" style="height:50px; object-fit:contain;">
+</div>
+
+<h1>UlmTool – Demo M24</h1>
+
+  <div class="box">
+    <div class="hint" id="status">Daten werden geladen ...</div>
+
+    <label>Gebäude</label>
+    <select id="buildingSelect"></select>
+
+    <label>Niveau</label>
+    <select id="levelSelect"></select>
+
+    <label>Raum</label>
+    <select id="roomSelect"></select>
+
+    <button onclick="showResults()">Daten anzeigen</button>
+    <button onclick="createPDF()">PDF erzeugen</button>
+    <button onclick="clearAll()">Alle Daten löschen</button>
+  </div>
+
+  <div class="box">
+    <h2>Treffer</h2>
+    <div id="results">Bitte zuerst eine Excel-Datei laden.</div>
+  </div>
+
+</div>
+
+<script>
+let data = [];
+
+const statusEl = document.getElementById('status');
+const buildingSelect = document.getElementById('buildingSelect');
+const levelSelect = document.getElementById('levelSelect');
+const roomSelect = document.getElementById('roomSelect');
+const resultsDiv = document.getElementById('results');
+
+function normalizeHeader(text) {
+  return String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeValue(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function findValue(row, possibleHeaders) {
+  const normalizedRow = {};
+
+  Object.keys(row).forEach(key => {
+    normalizedRow[normalizeHeader(key)] = row[key];
+  });
+
+  for (const header of possibleHeaders) {
+    const normalizedHeader = normalizeHeader(header);
+    if (normalizedRow[normalizedHeader] !== undefined) {
+      return normalizeValue(normalizedRow[normalizedHeader]);
+    }
+  }
+
+  return '';
+}
+
+function uniqueValues(key, filterFn = null) {
+  let values = data;
+  if (filterFn) values = values.filter(filterFn);
+
+  return [...new Set(values.map(item => item[key]).filter(v => v !== ''))]
+    .sort((a, b) => String(a).localeCompare(String(b), 'de', { numeric: true }));
+}
+
+function setSelectOptions(selectEl, values, placeholder) {
+  selectEl.innerHTML = '';
+
+  if (!values || values.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    selectEl.appendChild(option);
+    return;
+  }
+
+  values.forEach(value => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    selectEl.appendChild(option);
+  });
+}
+
+function populateBuildings() {
+  const buildings = uniqueValues('gebaeude');
+  setSelectOptions(buildingSelect, buildings, 'Keine Gebäude gefunden');
+  populateLevels();
+}
+
+function populateLevels() {
+  const building = buildingSelect.value;
+  const levels = uniqueValues('niveau', item => item.gebaeude === building);
+  setSelectOptions(levelSelect, levels, 'Keine Niveaus gefunden');
+  populateRooms();
+}
+
+function populateRooms() {
+  const building = buildingSelect.value;
+  const level = levelSelect.value;
+  const rooms = uniqueValues('raum', item => item.gebaeude === building && item.niveau === level);
+  setSelectOptions(roomSelect, rooms, 'Keine Räume gefunden');
+}
+
+function getSelectedData() {
+  const building = buildingSelect.value;
+  const level = levelSelect.value;
+  const room = roomSelect.value;
+
+  return data.filter(item =>
+    item.gebaeude === building &&
+    item.niveau === level &&
+    item.raum === room
+  );
+}
+
+function showResults() {
+  const rows = getSelectedData();
+  resultsDiv.innerHTML = '';
+
+  if (data.length === 0) {
+    resultsDiv.innerHTML = 'Bitte zuerst eine Excel-Datei laden.';
+    return;
+  }
+
+  if (rows.length === 0) {
+    resultsDiv.innerHTML = 'Für diese Auswahl wurden keine Daten gefunden.';
+    return;
+  }
+
+  rows.forEach(row => {
+    const div = document.createElement('div');
+    div.className = 'result';
+    div.innerHTML = `
+      <strong>${row.bauteil || 'ohne Bauteilangabe'}</strong><br>
+      ${row.beschreibung || 'keine Beschreibung'}<br>
+      <span class="small">${row.ergebnis || 'kein Ergebnis eingetragen'}</span>
+    `;
+    resultsDiv.appendChild(div);
+  });
+}
+
+async function loadExcelFromFile() {
+  try {
+    const response = await fetch('daten/ulmtool.xlsx');
+
+    if (!response.ok) {
+      throw new Error('Excel-Datei konnte nicht geladen werden.');
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false });
+
+    data = rawRows.map(row => ({
+      probe: findValue(row, ['Probe', 'Probennummer', 'Probenummer']),
+      gebaeude: findValue(row, ['Gebäude', 'Gebaeude']) || 'M24',
+      niveau: findValue(row, ['Niveau Ebene', 'Niveau / Ebene', 'Niveau/Ebene', 'Niveau Geschoss', 'Niveau / Geschoss', 'Niveau/Geschoss', 'Geschoss Niveau', 'Geschoss / Niveau', 'Geschoss/Niveau', 'Niveau', 'Ebene', 'Geschoss', 'Level']),
+      raum: findValue(row, ['Bereich Raum', 'Raum', 'Raumnummer', 'Bereich/Raum']),
+      bauteil: findValue(row, ['Bauteil']),
+      beschreibung: findValue(row, ['Beschreibung Bauteil', 'Bauteilbeschreibung', 'Beschreibung']),
+      analyse: findValue(row, ['Analyse auf/ Parameter', 'Analyse auf / Parameter', 'Analyse auf', 'Analyseparameter', 'Parameter']),
+      ergebnis: findValue(row, ['Ergebnis', 'Befund']),
+      quelle: findValue(row, ['Quelle', 'Projekt-/Gutachtennummer', 'Projekt / Gutachtennummer', 'Projekt', 'Gutachtennummer']),
+      datum: findValue(row, ['Datum']),
+      bemerkungen: findValue(row, ['Bemerkungen', 'Bemerkung']),
+      probenahmeDurch: findValue(row, ['Probenahme durch'])
+    })).filter(row => row.gebaeude || row.niveau || row.raum || row.bauteil || row.beschreibung || row.ergebnis);
+
+    if (data.length === 0) {
+      statusEl.textContent = 'Excel wurde geladen, aber keine verwertbaren Datensätze gefunden.';
+      resultsDiv.innerHTML = 'Bitte Spaltenüberschriften prüfen.';
+      return;
+    }
+
+    populateBuildings();
+    statusEl.textContent = `${data.length} Datensätze geladen.`;
+    showResults();
+
+  } catch (error) {
+    console.error(error);
+    statusEl.textContent = 'Fehler beim Laden der Excel-Datei.';
+    resultsDiv.innerHTML = 'Bitte prüfen, ob die Datei unter daten/ulmtool.xlsx im GitHub-Projekt liegt.';
+  }
+}
+
+function createPDF() {
+  const rows = getSelectedData();
+
+  if (rows.length === 0) {
+    alert('Keine Daten für diese Auswahl vorhanden.');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+
+  // LOGOS FÜR PDF
+  // Dateien später im Projektordner hinterlegen:
+  // /logos/bauanalytix.jpg
+  // /logos/vub.png
+  // Danach per addImage einfügen
+
+  // Beispiel:
+  // doc.addImage(bauanalytixLogo, 'JPEG', 14, 8, 55, 12);
+  // doc.addImage(vubLogo, 'PNG', 240, 8, 35, 12);
+
+  doc.setFontSize(16);
+  doc.text('UlmTool – Schadstoffübersicht', 14, 24);
+
+  doc.setFontSize(9);
+  doc.text(`Gebäude: ${buildingSelect.value} | Niveau: ${levelSelect.value} | Raum: ${roomSelect.value}`, 14, 23);
+
+  doc.setFontSize(8);
+  doc.text(
+    'Die nachfolgende Übersicht stellt eine Zusammenfassung der bislang dokumentierten Untersuchungsergebnisse dar. Fehlende Angaben zu einzelnen Räumen oder Bauteilen bedeuten nicht zwangsläufig Schadstofffreiheit. Sofern keine Untersuchungsergebnisse vorliegen, können ergänzende Erkundungen oder Probenahmen erforderlich sein.',
+    14,
+    30,
+    { maxWidth: 260 }
+  );
+
+  const tableData = rows.map(r => [
+    r.niveau,
+    r.raum,
+    r.bauteil,
+    r.beschreibung,
+    r.analyse,
+    r.ergebnis,
+    r.bemerkungen,
+    r.quelle
+  ]);
+
+  doc.autoTable({
+    startY: 42,
+    head: [[
+      'Niveau',
+      'Raum',
+      'Bauteil',
+      'Beschreibung Bauteil',
+      'Analyse auf / Parameter',
+      'Ergebnis',
+      'Bemerkungen',
+      'Quelle'
+    ]],
+    body: tableData,
+    styles: {
+      fontSize: 7,
+      cellPadding: 2,
+      overflow: 'linebreak'
+    },
+    headStyles: {
+      fillColor: [163, 0, 0],
+      textColor: 255
+    },
+    columnStyles: {
+      0: { cellWidth: 14 },
+      1: { cellWidth: 18 },
+      2: { cellWidth: 34 },
+      3: { cellWidth: 48 },
+      4: { cellWidth: 32 },
+      5: { cellWidth: 36 },
+      6: { cellWidth: 42 },
+      7: { cellWidth: 28 }
+    }
+  });
+
+  doc.save(`UlmTool_${buildingSelect.value}_${levelSelect.value}_${roomSelect.value}.pdf`);
+}
+
+function clearAll() {
+  data = [];
+  setSelectOptions(buildingSelect, [], 'Keine Gebäude geladen');
+  setSelectOptions(levelSelect, [], 'Keine Niveaus geladen');
+  setSelectOptions(roomSelect, [], 'Keine Räume geladen');
+  statusEl.textContent = 'Alle Daten gelöscht.';
+  resultsDiv.innerHTML = 'Daten wurden gelöscht. Zum erneuten Laden bitte Seite aktualisieren.';
+}
+
+buildingSelect.addEventListener('change', populateLevels);
+levelSelect.addEventListener('change', populateRooms);
+roomSelect.addEventListener('change', showResults);
+
+clearAll();
+loadExcelFromFile();
+</script>
+
+</body>
+</html>
