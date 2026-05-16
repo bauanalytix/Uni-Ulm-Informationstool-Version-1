@@ -89,8 +89,8 @@
 <div class="container">
 
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; gap:20px; flex-wrap:wrap;">
-  <img src="logos/bauanalytix.jpg" alt="bauanalytix" style="height:55px; object-fit:contain;">
-  <img src="logos/vub.png" alt="Vermögen und Bau" style="height:50px; object-fit:contain;">
+  <img src="bauanalytix.jpg" alt="bauanalytix" style="height:55px; object-fit:contain;">
+  <img src="vub.png" alt="Vermögen und Bau" style="height:50px; object-fit:contain;">
 </div>
 
 <h1>UlmTool – Demo M24</h1>
@@ -248,7 +248,7 @@ function showResults() {
 
 async function loadExcelFromFile() {
   try {
-    const response = await fetch('daten/ulmtool.xlsx');
+    const response = await fetch('ulmtool.xlsx');
 
     if (!response.ok) {
       throw new Error('Excel-Datei konnte nicht geladen werden.');
@@ -287,7 +287,7 @@ async function loadExcelFromFile() {
   } catch (error) {
     console.error(error);
     statusEl.textContent = 'Fehler beim Laden der Excel-Datei.';
-    resultsDiv.innerHTML = 'Bitte prüfen, ob die Datei unter daten/ulmtool.xlsx im GitHub-Projekt liegt.';
+    resultsDiv.innerHTML = 'Bitte prüfen, ob die Datei ulmtool.xlsx im gleichen GitHub-Ordner wie die index.html liegt.';
   }
 }
 
@@ -303,9 +303,9 @@ function createPDF() {
   const doc = new jsPDF({ orientation: 'landscape' });
 
   // LOGOS FÜR PDF
-  // Dateien später im Projektordner hinterlegen:
-  // /logos/bauanalytix.jpg
-  // /logos/vub.png
+  // Dateien im gleichen Projektordner hinterlegen:
+  // bauanalytix.jpg
+  // vub.png
   // Danach per addImage einfügen
 
   // Beispiel:
