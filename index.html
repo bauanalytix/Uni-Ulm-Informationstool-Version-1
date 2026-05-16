@@ -236,7 +236,16 @@ function showResults() {
     const div = document.createElement('div');
     div.className = 'result';
     div.innerHTML = `
-      <strong>${row.bauteil || 'ohne Bauteilangabe'}</strong><br>
+<span style="
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:${row.warnung === 'rot' ? '#c00000' : row.warnung === 'orange' ? '#f4a000' : '#008000'};
+  margin-right:8px;
+"></span>
+<strong>${row.bauteil || 'ohne Bauteilangabe'}</strong><br>
+
       ${row.beschreibung || 'keine Beschreibung'}<br>
       <span class="small">${row.ergebnis || 'kein Ergebnis eingetragen'}</span>
     `;
@@ -246,7 +255,7 @@ function showResults() {
 
 async function loadExcelFromFile() {
   try {
-    const response = await fetch('ulmtool.xlsx');
+    const response = await fetch('ulmtool1.xlsx');
 
     if (!response.ok) {
       throw new Error('Excel-Datei konnte nicht geladen werden.');
@@ -266,6 +275,7 @@ async function loadExcelFromFile() {
       beschreibung: findValue(row, ['Beschreibung Bauteil', 'Bauteilbeschreibung', 'Beschreibung']),
       analyse: findValue(row, ['Analyse auf/ Parameter', 'Analyse auf / Parameter', 'Analyse auf', 'Analyseparameter', 'Parameter']),
       ergebnis: findValue(row, ['Ergebnis', 'Befund']),
+      warnung: findValue(row, ['Warnung', 'Ampel', 'Status']),
       quelle: findValue(row, ['Quelle', 'Projekt-/Gutachtennummer', 'Projekt / Gutachtennummer', 'Projekt', 'Gutachtennummer']),
       datum: findValue(row, ['Datum']),
       bemerkungen: findValue(row, ['Bemerkungen', 'Bemerkung']),
@@ -342,6 +352,7 @@ async function createPDF() {
   );
 
   const tableData = rows.map(r => [
+    r.warnung,
     r.niveau,
     r.raum,
     r.bauteil,
@@ -355,6 +366,7 @@ async function createPDF() {
   doc.autoTable({
     startY: 58,
     head: [[
+      'Warnung',
       'Niveau',
       'Raum',
       'Bauteil',
@@ -370,19 +382,31 @@ async function createPDF() {
       cellPadding: 2,
       overflow: 'linebreak'
     },
-    headStyles: {
+      headStyles: {
       fillColor: [163, 0, 0],
       textColor: 255
     },
+
     columnStyles: {
       0: { cellWidth: 14 },
       1: { cellWidth: 18 },
-      2: { cellWidth: 34 },
-      3: { cellWidth: 48 },
-      4: { cellWidth: 32 },
-      5: { cellWidth: 36 },
-      6: { cellWidth: 42 },
-      7: { cellWidth: 28 }
+      2: { cellWidth: 30 },
+      3: { cellWidth: 42 },
+      4: { cellWidth: 46 },
+      5: { cellWidth: 32 },
+      6: { cellWidth: 36 },
+      7: { cellWidth: 38 },
+      8: { cellWidth: 24 }
+    },
+
+    didParseCell: function (data) {
+      if (data.section === 'body' && data.column.index === 0) {
+        const value = String(data.cell.raw || '').trim().toLowerCase();
+
+        if (value === 'rot') data.cell.styles.textColor = [192, 0, 0];
+        if (value === 'orange') data.cell.styles.textColor = [244, 160, 0];
+        if (value === 'grün' || value === 'gruen') data.cell.styles.textColor = [0, 128, 0];
+      }
     }
   });
 
