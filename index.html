@@ -323,7 +323,7 @@ async function createPDF() {
     const bauanalytixLogo = await loadImageAsDataURL('bauanalytix.jpg');
     const vubLogo = await loadImageAsDataURL('vub.png');
 
-    doc.addImage(bauanalytixLogo, 'PNG', 14, 8, 55, 12);
+    doc.addImage(bauanalytixLogo, 'PNG', 14, 8, 55, 11);
     doc.addImage(vubLogo, 'PNG', 230, 8, 48, 13);
   } catch (error) {
     console.warn('Logos konnten im PDF nicht geladen werden.', error);
@@ -335,7 +335,7 @@ async function createPDF() {
   doc.setFontSize(9);
   doc.text(`Gebäude: ${buildingSelect.value} | Niveau: ${levelSelect.value} | Raum: ${roomSelect.value}`, 14, 37);
 
-  doc.setFontSize(10);
+  doc.setFontSize(12);
   doc.text(
     'Die nachfolgende Übersicht stellt eine Zusammenfassung der bislang dokumentierten Untersuchungsergebnisse dar. Fehlende Angaben zu einzelnen Räumen oder Bauteilen bedeuten nicht zwangsläufig Schadstofffreiheit. Sofern keine Untersuchungsergebnisse vorliegen, können ergänzende Erkundungen oder Probenahmen erforderlich sein.',
     14,
